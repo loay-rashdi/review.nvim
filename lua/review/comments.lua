@@ -25,9 +25,9 @@ function M.add_at_cursor(initial_type)
 
   popup.open(initial_type or "note", nil, function(comment_type, text)
     if comment_type and text then
-      store.add(file, line, comment_type, text, nil, side)
+      local comment = store.add(file, line, comment_type, text, nil, side)
       vim.schedule(function()
-        marks.refresh()
+        marks.refresh_comment(comment)
       end)
       notify(string.format("Added %s comment", comment_type), vim.log.levels.INFO)
     end
@@ -53,7 +53,7 @@ function M.file_comment(initial_type)
       if new_type and text then
         store.update(existing.id, text, new_type)
         vim.schedule(function()
-          marks.refresh()
+          marks.refresh_comment(existing)
         end)
         notify("File comment updated", vim.log.levels.INFO)
       end
@@ -61,9 +61,9 @@ function M.file_comment(initial_type)
   else
     popup.open(initial_type or "note", nil, function(comment_type, text)
       if comment_type and text then
-        store.add(file, 0, comment_type, text)
+        local comment = store.add(file, 0, comment_type, text)
         vim.schedule(function()
-          marks.refresh()
+          marks.refresh_comment(comment)
         end)
         notify(string.format("Added %s file comment", comment_type), vim.log.levels.INFO)
       end
@@ -87,9 +87,9 @@ function M.add_for_range(initial_type)
 
   popup.open(initial_type or "note", nil, function(comment_type, text)
     if comment_type and text then
-      store.add(file, start_line, comment_type, text, end_line, side)
+      local comment = store.add(file, start_line, comment_type, text, end_line, side)
       vim.schedule(function()
-        marks.refresh()
+        marks.refresh_comment(comment)
       end)
       notify(string.format("Added %s comment", comment_type), vim.log.levels.INFO)
     end
@@ -117,7 +117,7 @@ function M.edit_at_cursor()
       store.update(comment.id, text, new_type)
       -- Schedule refresh to run after popup is fully closed
       vim.schedule(function()
-        marks.refresh()
+        marks.refresh_comment(comment)
       end)
       notify("Comment updated", vim.log.levels.INFO)
     end
@@ -147,7 +147,7 @@ function M.delete_at_cursor()
       store.delete(comment.id)
       -- Schedule refresh to run after UI is closed
       vim.schedule(function()
-        marks.refresh()
+        marks.refresh_comment(comment, { delete = true })
       end)
       notify("Comment deleted", vim.log.levels.INFO)
     end

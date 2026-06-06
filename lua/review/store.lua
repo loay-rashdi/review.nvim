@@ -17,6 +17,10 @@ M.comments = {}
 
 local id_counter = 0
 local loaded = false
+local save_timer = nil
+local save_delay_ms = 200
+local flush_augroup = vim.api.nvim_create_augroup("review_store_flush", { clear = true })
+local dirty = false
 
 ---@return string
 local function generate_id()
@@ -24,14 +28,53 @@ local function generate_id()
   return string.format("comment_%d_%d", os.time(), id_counter)
 end
 
-local function persist()
+local function save_now()
+  if save_timer then
+    save_timer:stop()
+    save_timer:close()
+    save_timer = nil
+  end
+  if not dirty then
+    return
+  end
   storage.save(M.comments)
+  dirty = false
 end
 
+local function persist()
+  dirty = true
+  if save_timer then
+    save_timer:stop()
+  else
+    save_timer = vim.loop.new_timer()
+  end
+
+  save_timer:start(save_delay_ms, 0, vim.schedule_wrap(function()
+    save_now()
+  end))
+end
+
+function M.flush()
+  save_now()
+end
+
+vim.api.nvim_create_autocmd("VimLeavePre", {
+  group = flush_augroup,
+  callback = function()
+    M.flush()
+  end,
+})
+
 function M.reset()
+  if save_timer then
+    save_timer:stop()
+    save_timer:close()
+    save_timer = nil
+  end
   M.comments = {}
   id_counter = 0
   loaded = false
+  dirty = false
 end
 
 function M.load()
