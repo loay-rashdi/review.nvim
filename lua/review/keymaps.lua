@@ -181,7 +181,8 @@ local function show_help()
 end
 
 ---@param bufnr number
-local function set_buffer_keymaps(bufnr)
+---@param is_diff_buffer boolean
+local function set_buffer_keymaps(bufnr, is_diff_buffer)
   -- Clear existing keymaps first
   clear_buffer_keymaps(bufnr)
 
@@ -237,20 +238,16 @@ local function set_buffer_keymaps(bufnr)
     end
   end
 
-  if readonly then
+  if is_diff_buffer and readonly then
     -- READONLY MODE: Full review keymaps
     set(km.readonly_add, function() comments.add_with_menu() end, "Add comment (pick type)")
     set_visual(km.readonly_add, ":<C-u>lua require('review.comments').add_for_range()<CR>", "Add comment for selection")
     set(km.readonly_add_file, function() comments.file_comment() end, "File comment")
     set(km.readonly_delete, function() comments.delete_at_cursor() end, "Delete comment")
     set(km.readonly_edit, function() comments.edit_at_cursor() end, "Edit comment")
-    set(km.list_comments, function() comments.list() end, "List all comments")
-    set(km.export_clipboard, function() export.to_clipboard() end, "Export to clipboard")
-    set(km.send_sidekick, function() export.to_sidekick() end, "Send to sidekick")
-    set(km.clear_comments, function() require("review").clear() end, "Clear all comments")
     set(km.next_comment, function() comments.goto_next() end, "Next comment")
     set(km.prev_comment, function() comments.goto_prev() end, "Previous comment")
-  else
+  elseif is_diff_buffer then
     -- EDIT MODE: Typed add keymaps with visual mode support
     set(km.add_comment, function() comments.add_with_menu() end, "Add comment (pick type)")
     set_visual(km.add_comment, ":<C-u>lua require('review.comments').add_for_range()<CR>", "Add comment for selection")
@@ -265,6 +262,13 @@ local function set_buffer_keymaps(bufnr)
     set(km.add_file_comment, function() comments.file_comment() end, "File comment")
     set(km.delete_comment, function() comments.delete_at_cursor() end, "Delete comment")
     set(km.edit_comment, function() comments.edit_at_cursor() end, "Edit comment")
+  end
+
+  if readonly then
+    set(km.list_comments, function() comments.list() end, "List all comments")
+    set(km.export_clipboard, function() export.to_clipboard() end, "Export to clipboard")
+    set(km.send_sidekick, function() export.to_sidekick() end, "Send to sidekick")
+    set(km.clear_comments, function() require("review").clear() end, "Clear all comments")
   end
 
   -- Navigation and close - available in both modes (or edit mode only for nav)
@@ -309,8 +313,14 @@ function M.setup_keymaps(tabpage)
   end
   keymapped_buffers = {}
 
+  local function is_diff_buffer(bufnr)
+    local orig_buf, mod_buf = lifecycle.get_buffers(tabpage)
+    return bufnr == orig_buf or bufnr == mod_buf
+  end
+
   -- Set keymaps on current buffer
-  set_buffer_keymaps(vim.api.nvim_get_current_buf())
+  local current_buf = vim.api.nvim_get_current_buf()
+  set_buffer_keymaps(current_buf, is_diff_buffer(current_buf))
 
   -- Set up autocmd to apply keymaps when entering any buffer in this tabpage
   vim.api.nvim_create_autocmd("BufEnter", {
@@ -318,7 +328,8 @@ function M.setup_keymaps(tabpage)
     callback = function()
       if vim.api.nvim_get_current_tabpage() ~= tabpage then return end
       if not lifecycle.get_session(tabpage) then return end
-      set_buffer_keymaps(vim.api.nvim_get_current_buf())
+      local bufnr = vim.api.nvim_get_current_buf()
+      set_buffer_keymaps(bufnr, is_diff_buffer(bufnr))
     end,
   })
 end
